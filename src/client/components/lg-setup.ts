@@ -149,8 +149,7 @@ export class LgSetup extends LitElement {
 		}
 
 		.slot.off lg-card {
-			opacity: 0.45;
-			filter: saturate(0.4);
+			filter: grayscale(0.85) brightness(0.5);
 		}
 
 		.stepper {

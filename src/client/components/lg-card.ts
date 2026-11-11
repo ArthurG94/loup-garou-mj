@@ -4,13 +4,13 @@ import { customElement, property } from 'lit/decorators.js';
 import { getRole, roleImage } from '../../shared/roles.js';
 import type { Camp, RoleId, Timing } from '../../shared/types.js';
 
-const CAMP_LABELS: Record<Camp, string> = {
+export const CAMP_LABELS: Record<Camp, string> = {
 	village: 'Village',
 	loups: 'Loups',
 	solitaire: 'Solitaire',
 };
 
-const TIMING_LABELS: Record<Timing, string> = {
+export const TIMING_LABELS: Record<Timing, string> = {
 	'jamais': 'Aucun réveil',
 	'premiere-nuit': '1re nuit',
 	'chaque-nuit': 'Chaque nuit',
@@ -62,6 +62,17 @@ export class LgCard extends LitElement {
 			--w: min(240px, 62vw);
 		}
 
+		:host([zoomable]:not([size="mini"])) {
+			cursor: zoom-in;
+		}
+
+		.tilt {
+			transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+			transform-style: preserve-3d;
+			transition: transform 120ms ease-out;
+			will-change: transform;
+		}
+
 		.flip {
 			position: relative;
 			aspect-ratio: 63 / 88;
@@ -90,8 +101,6 @@ export class LgCard extends LitElement {
 			background:
 				linear-gradient(145deg, var(--camp-light), var(--camp) 35%, color-mix(in oklab, var(--camp) 50%, black) 70%, var(--camp-light));
 			box-shadow: 0 10px 30px -10px rgba(0, 0, 0, .8), inset 0 0 0 1px rgba(255, 255, 255, .25);
-			transform: rotateY(0deg) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
-			transition: transform 150ms ease-out;
 		}
 
 		.front.loups {
@@ -287,24 +296,60 @@ export class LgCard extends LitElement {
 	@property()
 	public accessor caption: string | null = null;
 
+	/** Ouvre la carte en plein écran au clic (désactivé dans la vue plein écran elle-même). */
+	@property({ type: Boolean, reflect: true })
+	public accessor zoomable = true;
+
+	private frame = 0;
+
+	/**
+	 * L'inclinaison suit le pointeur. Les mesures se font sur l'élément hôte, qui ne bouge pas :
+	 * mesurer la carte inclinée elle-même la faisait clignoter.
+	 */
 	private readonly onMove = (event: PointerEvent): void => {
-		const target = event.currentTarget as HTMLElement;
-		const rect = target.getBoundingClientRect();
-		const x = (event.clientX - rect.left) / rect.width;
-		const y = (event.clientY - rect.top) / rect.height;
-		target.style.setProperty('--mx', `${x * 100}%`);
-		target.style.setProperty('--my', `${y * 100}%`);
-		target.style.setProperty('--ry', `${(x - 0.5) * 14}deg`);
-		target.style.setProperty('--rx', `${(0.5 - y) * 14}deg`);
-		target.style.setProperty('--glare', '0.9');
+		if (this.size === 'mini' || event.pointerType !== 'mouse') {
+			return;
+		}
+		const { clientX, clientY } = event;
+		cancelAnimationFrame(this.frame);
+		this.frame = requestAnimationFrame(() => {
+			const rect = this.getBoundingClientRect();
+			const x = Math.min(Math.max((clientX - rect.left) / rect.width, 0), 1);
+			const y = Math.min(Math.max((clientY - rect.top) / rect.height, 0), 1);
+			this.style.setProperty('--mx', `${x * 100}%`);
+			this.style.setProperty('--my', `${y * 100}%`);
+			this.style.setProperty('--ry', `${(x - 0.5) * 16}deg`);
+			this.style.setProperty('--rx', `${(0.5 - y) * 16}deg`);
+			this.style.setProperty('--glare', '0.9');
+		});
 	};
 
-	private readonly onLeave = (event: PointerEvent): void => {
-		const target = event.currentTarget as HTMLElement;
+	private readonly onLeave = (): void => {
+		cancelAnimationFrame(this.frame);
 		for (const name of ['--mx', '--my', '--rx', '--ry', '--glare']) {
-			target.style.removeProperty(name);
+			this.style.removeProperty(name);
 		}
 	};
+
+	private readonly onClick = (): void => {
+		if (this.zoomable && this.roleId && this.face === 'front') {
+			this.dispatchEvent(new CustomEvent<RoleId>('card-open', { detail: this.roleId, bubbles: true, composed: true }));
+		}
+	};
+
+	public override connectedCallback(): void {
+		super.connectedCallback();
+		this.addEventListener('pointermove', this.onMove);
+		this.addEventListener('pointerleave', this.onLeave);
+		this.addEventListener('click', this.onClick);
+	}
+
+	public override disconnectedCallback(): void {
+		super.disconnectedCallback();
+		this.removeEventListener('pointermove', this.onMove);
+		this.removeEventListener('pointerleave', this.onLeave);
+		this.removeEventListener('click', this.onClick);
+	}
 
 	private renderClaw(): TemplateResult {
 		return html`<svg class="claw" viewBox="0 0 100 140" preserveAspectRatio="none" aria-hidden="true">
@@ -316,14 +361,9 @@ export class LgCard extends LitElement {
 
 	protected override render(): TemplateResult {
 		const role = this.roleId ? getRole(this.roleId) : null;
-		const interactive = this.size !== 'mini';
-		return html`<div class="flip">
+		return html`<div class="tilt"><div class="flip">
 			${role
-				? html`<div
-				class="face front ${role.camp} ${this.dead ? 'dead' : ''}"
-				@pointermove=${interactive ? this.onMove : nothing}
-				@pointerleave=${interactive ? this.onLeave : nothing}
-			>
+				? html`<div class="face front ${role.camp} ${this.dead ? 'dead' : ''}">
 				<div class="inner">
 					<div class="title">
 						<h3>${role.name}</h3>
@@ -342,7 +382,7 @@ export class LgCard extends LitElement {
 				: nothing}
 			<div class="face back" aria-hidden=${this.face === 'front' ? 'true' : 'false'}><span>${this.caption ?? 'Thiercelieux'}</span></div>
 			<slot name="badge" class="badge"></slot>
-		</div>`;
+		</div></div>`;
 	}
 }
 

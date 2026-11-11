@@ -305,7 +305,7 @@ export class LgStepWidget extends LitElement {
 			${dead.length === 0
 				? html`<div class="answer no">Personne n'est mort cette nuit.</div>`
 				: html`<div class="victims">${dead.map(player => html`<div class="victim">
-					<lg-card size="mini" .roleId=${player.roleId} dead .face=${player.roleId ? 'front' : 'back'}></lg-card>
+					<lg-card size="mini" .roleId=${player.roleId} face="back" .caption=${player.name}></lg-card>
 					<strong>${player.name}</strong>
 				</div>`)}</div>`}
 			${asleep.length > 0 ? html`<div class="answer">💤 ${asleep.join(', ')} ne parle pas et ne vote pas aujourd'hui.</div>` : nothing}
@@ -517,7 +517,7 @@ export class LgStepWidget extends LitElement {
 					const result = vote(next, id);
 					return result === 'idiot'
 						? { tone: 'no', text: `${this.name(id)} est l'idiot du village : il survit mais ne votera plus.` }
-						: { tone: 'yes', text: `${this.name(id)} est éliminé. Retournez sa carte.` };
+						: { tone: 'yes', text: `${this.name(id)} est éliminé. Sa carte reste cachée.` };
 				});
 			})}
 			<div class="row">

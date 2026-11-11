@@ -1,11 +1,11 @@
 import { css, html, LitElement, nothing } from 'lit';
 import type { TemplateResult } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
-import { ROLES } from '../../shared/roles.js';
+import { getRole, ROLES } from '../../shared/roles.js';
 import type { RoleId } from '../../shared/types.js';
 import { store } from '../store.js';
 import { shared } from '../styles.js';
-import './lg-card.js';
+import { CAMP_LABELS, TIMING_LABELS } from './lg-card.js';
 import './lg-narration.js';
 import './lg-setup.js';
 import './lg-village.js';
@@ -109,11 +109,63 @@ export class LgApp extends LitElement {
 			position: fixed;
 			inset: 0;
 			z-index: 20;
+			overflow-y: auto;
 			display: grid;
-			place-items: center;
-			padding: 24px;
-			background: rgba(5, 6, 20, .85);
-			backdrop-filter: blur(6px);
+			justify-items: center;
+			align-content: start;
+			gap: 20px;
+			padding: max(20px, env(safe-area-inset-top, 0px)) 16px calc(32px + env(safe-area-inset-bottom, 0px));
+			background: rgba(5, 6, 20, .92);
+			backdrop-filter: blur(8px);
+			animation: focus-in 220ms ease-out;
+		}
+
+		@keyframes focus-in {
+			from {
+				opacity: 0;
+				transform: scale(.96);
+			}
+		}
+
+		.focus .close {
+			position: sticky;
+			top: 0;
+			justify-self: end;
+			z-index: 1;
+		}
+
+		.focus lg-card {
+			--w: min(340px, 86vw);
+		}
+
+		.detail {
+			display: grid;
+			gap: 12px;
+			width: min(560px, 100%);
+		}
+
+		.detail h2 {
+			font-size: clamp(1.8rem, 7vw, 2.4rem);
+			color: var(--gold-light);
+			text-align: center;
+		}
+
+		.detail .chips {
+			display: flex;
+			flex-wrap: wrap;
+			justify-content: center;
+			gap: 8px;
+		}
+
+		.detail p {
+			margin: 0;
+			font-size: 1.1rem;
+			line-height: 1.45;
+		}
+
+		.detail .lore {
+			font-style: italic;
+			color: var(--muted);
 		}
 	`];
 
@@ -128,6 +180,16 @@ export class LgApp extends LitElement {
 
 	private wakeLock: { release: () => Promise<void> } | null = null;
 
+	private readonly onCardOpen = (event: Event): void => {
+		this.focused = (event as CustomEvent<RoleId>).detail;
+	};
+
+	private readonly onKey = (event: KeyboardEvent): void => {
+		if (event.key === 'Escape') {
+			this.focused = null;
+		}
+	};
+
 	private readonly onChange = (): void => {
 		this.requestUpdate();
 		this.syncAmbiance();
@@ -136,12 +198,16 @@ export class LgApp extends LitElement {
 	public override connectedCallback(): void {
 		super.connectedCallback();
 		store.addEventListener('change', this.onChange);
+		this.addEventListener('card-open', this.onCardOpen);
+		document.addEventListener('keydown', this.onKey);
 		this.syncAmbiance();
 	}
 
 	public override disconnectedCallback(): void {
 		super.disconnectedCallback();
 		store.removeEventListener('change', this.onChange);
+		this.removeEventListener('card-open', this.onCardOpen);
+		document.removeEventListener('keydown', this.onKey);
 	}
 
 	/** Fond selon la phase, et écran maintenu allumé pendant la partie. */
@@ -169,9 +235,7 @@ export class LgApp extends LitElement {
 			case 'village':
 				return game ? html`<lg-village .game=${game}></lg-village>` : html`<p class="muted">Le village apparaîtra une fois la partie commencée.</p>`;
 			case 'cartes':
-				return html`<div class="gallery">${ROLES.map(role => html`<lg-card .roleId=${role.id} @click=${(): void => {
-					this.focused = role.id;
-				}}></lg-card>`)}</div>`;
+				return html`<div class="gallery">${ROLES.map(role => html`<lg-card .roleId=${role.id}></lg-card>`)}</div>`;
 		}
 	}
 
@@ -215,11 +279,37 @@ export class LgApp extends LitElement {
 					this.tab = tab.id;
 				}}><span aria-hidden="true">${tab.icon}</span>${tab.label}</button>`)}
 			</nav>
-			${this.focused
-				? html`<div class="focus" @click=${(): void => {
-					this.focused = null;
-				}}><lg-card size="large" .roleId=${this.focused}></lg-card></div>`
-				: nothing}`;
+			${this.renderFocus()}`;
+	}
+
+	/** Carte en plein écran avec tout son détail. */
+	private renderFocus(): TemplateResult | typeof nothing {
+		if (!this.focused) {
+			return nothing;
+		}
+		const role = getRole(this.focused);
+		const close = (): void => {
+			this.focused = null;
+		};
+		return html`<div class="focus" role="dialog" aria-modal="true" aria-label=${role.name} @click=${(event: Event): void => {
+			if (event.target === event.currentTarget) {
+				close();
+			}
+		}}>
+			<button class="btn small close" aria-label="Fermer" @click=${close}>✕ Fermer</button>
+			<lg-card size="large" .roleId=${role.id} .zoomable=${false}></lg-card>
+			<section class="detail panel">
+				<h2>${role.name}</h2>
+				<div class="chips">
+					<span class="chip">${CAMP_LABELS[role.camp]}</span>
+					<span class="chip">${TIMING_LABELS[role.timing]}</span>
+					${role.max > 1 ? html`<span class="chip">Jusqu'à ${role.max} exemplaires</span>` : nothing}
+				</div>
+				<span class="label">Pouvoir</span>
+				<p>${role.power}</p>
+				${role.lore ? html`<span class="label">Histoire</span><p class="lore">${role.lore}</p>` : nothing}
+			</section>
+		</div>`;
 	}
 }
 

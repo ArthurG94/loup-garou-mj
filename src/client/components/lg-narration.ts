@@ -103,6 +103,24 @@ export class LgNarration extends LitElement {
 			margin: 0;
 		}
 
+		.gestures {
+			display: grid;
+			gap: 8px;
+			padding: 16px 18px;
+			border-radius: 18px;
+			background: color-mix(in oklab, var(--solitaire) 18%, var(--surface));
+			border-left: 3px solid var(--solitaire-light);
+		}
+
+		.gestures ol {
+			display: grid;
+			gap: 6px;
+			margin: 0;
+			padding-left: 1.3em;
+			font-size: 1.1rem;
+			font-weight: 600;
+		}
+
 		.todo {
 			margin: 0;
 			color: var(--muted);
@@ -183,10 +201,30 @@ export class LgNarration extends LitElement {
 		</div>`)}`;
 	}
 
+	/** Noms des joueurs qui tiennent les rôles de l'étape, ou le nom du rôle s'ils sont inconnus. */
 	private wakers(game: GameState, step: Step): string {
 		const roles = step.roles === PACK_ROLES ? [] : step.roles;
-		const names = roles.flatMap(roleId => holders(game, roleId)).map(player => player.name);
-		return names.length > 0 ? `Réveiller : ${names.join(', ')}` : '';
+		const names = roles.flatMap(roleId => holders(game, roleId).filter(player => player.alive || step.widget === 'hunter')).map(player => player.name);
+		if (names.length > 0) {
+			return names.join(' et ');
+		}
+		return roles.map(roleId => roleLabel(roleId)).join(' et ');
+	}
+
+	/** Gestes silencieux : toucher l'épaule pour réveiller, puis pour rendormir. */
+	private renderGestures(game: GameState, step: Step): TemplateResult | typeof nothing {
+		if (!step.gestures) {
+			return nothing;
+		}
+		const who = this.wakers(game, step);
+		const wakes = step.roles.length > 0 && step.roles !== PACK_ROLES;
+		const lines = wakes
+			? [`Réveil : touchez l'épaule de ${who}.`, ...step.gestures, 'Fin : touchez de nouveau son épaule.']
+			: step.gestures;
+		return html`<div class="gestures">
+			<span class="label">🤫 En silence</span>
+			<ol>${lines.map(line => html`<li>${line}</li>`)}</ol>
+		</div>`;
 	}
 
 	protected override render(): TemplateResult | typeof nothing {
@@ -211,11 +249,12 @@ export class LgNarration extends LitElement {
 			<div class="stage">
 				<lg-card size="large" .roleId=${roleId} .face=${roleId ? this.face : 'back'} .caption=${roleId ? null : phaseLabel(game.phase)} ?dead=${step.fake !== null}></lg-card>
 				<h2>${step.title}</h2>
-				${wakers ? html`<span class="who">${wakers}</span>` : nothing}
+				${wakers && !step.gestures ? html`<span class="who">${wakers}</span>` : nothing}
 				${step.condition ? html`<span class="condition">Condition : ${step.condition}</span>` : nothing}
 				${step.fake ? html`<div class="fake">${step.fake}</div>` : nothing}
 			</div>
-			${step.say.length > 0 ? html`<blockquote class="say">${step.say.map(line => html`<p>« ${line} »</p>`)}</blockquote>` : nothing}
+			${step.say.length > 0 ? html`<blockquote class="say"><span class="label">🗣 À voix haute</span>${step.say.map(line => html`<p>« ${line} »</p>`)}</blockquote>` : nothing}
+			${this.renderGestures(game, step)}
 			${step.todo ? html`<p class="todo">👉 ${step.todo}</p>` : nothing}
 			${this.renderAssign(game, step)}
 			<lg-step-widget .game=${game} .step=${step}></lg-step-widget>
