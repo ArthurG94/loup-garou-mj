@@ -4,6 +4,7 @@ import { customElement, state } from 'lit/decorators.js';
 import { getRole, ROLES } from '../../shared/roles.js';
 import type { RoleId } from '../../shared/types.js';
 import { store } from '../store.js';
+import { enableGyro, GYRO_CHANGE, gyroNeedsPermission } from '../tilt.js';
 import { shared } from '../styles.js';
 import { CAMP_LABELS, TIMING_LABELS } from './lg-card.js';
 import './lg-narration.js';
@@ -199,6 +200,7 @@ export class LgApp extends LitElement {
 		super.connectedCallback();
 		store.addEventListener('change', this.onChange);
 		this.addEventListener('card-open', this.onCardOpen);
+		window.addEventListener(GYRO_CHANGE, this.onChange);
 		document.addEventListener('keydown', this.onKey);
 		this.syncAmbiance();
 	}
@@ -207,6 +209,7 @@ export class LgApp extends LitElement {
 		super.disconnectedCallback();
 		store.removeEventListener('change', this.onChange);
 		this.removeEventListener('card-open', this.onCardOpen);
+		window.removeEventListener(GYRO_CHANGE, this.onChange);
 		document.removeEventListener('keydown', this.onKey);
 	}
 
@@ -249,6 +252,11 @@ export class LgApp extends LitElement {
 		return html`
 			<header>
 				<h1>Loup-Garou · MJ</h1>
+				${gyroNeedsPermission()
+					? html`<button class="btn small" title="Les cartes suivent les mouvements du téléphone" @click=${async (): Promise<void> => {
+						await enableGyro();
+					}}>✨ Effet 3D</button>`
+					: nothing}
 				${game
 					? html`<button class="btn small" ?disabled=${!store.canUndo} @click=${(): void => {
 						store.undo();

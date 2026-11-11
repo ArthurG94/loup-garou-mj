@@ -218,13 +218,18 @@ export class LgCard extends LitElement {
 			font-size: 11cqw;
 		}
 
+		/* Sur téléphone, les grandes cartes suivent le gyroscope (voir tilt.ts). */
+		:host([size="large"]) .tilt {
+			transform: rotateX(var(--rx, var(--device-rx, 0deg))) rotateY(var(--ry, var(--device-ry, 0deg)));
+		}
+
 		.glare {
 			position: absolute;
 			inset: 0;
 			pointer-events: none;
 			border-radius: inherit;
 			background:
-				radial-gradient(circle at var(--mx, 30%) var(--my, 20%), rgba(255, 255, 255, .45), transparent 45%),
+				radial-gradient(circle at var(--mx, var(--device-mx, 30%)) var(--my, var(--device-my, 20%)), rgba(255, 255, 255, .45), transparent 45%),
 				linear-gradient(115deg, transparent 30%, rgba(255, 230, 160, .18) 45%, rgba(160, 220, 255, .18) 55%, transparent 70%);
 			mix-blend-mode: overlay;
 			opacity: var(--glare, .55);
