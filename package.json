@@ -1,0 +1,33 @@
+{
+	"name": "loup-garou-mj",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"description": "Assistant du maître du jeu pour notre Loup-Garou maison",
+	"scripts": {
+		"dev": "concurrently -n serveur,client \"tsx watch src/server/index.ts\" \"vite\"",
+		"build": "vite build && tsc -p tsconfig.server.json",
+		"start": "node dist/server/server/index.js",
+		"typecheck": "tsc --noEmit && tsc -p tsconfig.server.json --noEmit",
+		"lint": "eslint .",
+		"test": "vitest run"
+	},
+	"engines": {
+		"node": ">=22"
+	},
+	"dependencies": {
+		"@fastify/static": "^10.1.10",
+		"fastify": "^5.6.0",
+		"lit": "^3.3.0"
+	},
+	"devDependencies": {
+		"@turtl/eslint-config": "github:ArthurG94/eslint-config#v0.3.0",
+		"@types/node": "^22.15.0",
+		"concurrently": "^10.0.7",
+		"eslint": "^10.4.0",
+		"tsx": "^4.20.0",
+		"typescript": "~6.0.3",
+		"vite": "^8.3.8",
+		"vitest": "^5.1.0"
+	}
+}
