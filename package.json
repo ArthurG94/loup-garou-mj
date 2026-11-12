@@ -5,8 +5,11 @@
 	"type": "module",
 	"description": "Assistant du maître du jeu pour notre Loup-Garou maison",
 	"scripts": {
-		"dev": "concurrently -n serveur,client \"tsx watch src/server/index.ts\" \"vite\"",
-		"build": "vite build && tsc -p tsconfig.server.json",
+		"dev": "vite",
+		"build": "vite build",
+		"preview": "vite preview",
+		"dev:serveur": "concurrently -n serveur,client \"tsx watch src/server/index.ts\" \"vite\"",
+		"build:serveur": "vite build && tsc -p tsconfig.server.json",
 		"start": "node dist/server/server/index.js",
 		"typecheck": "tsc --noEmit && tsc -p tsconfig.server.json --noEmit",
 		"lint": "eslint .",
