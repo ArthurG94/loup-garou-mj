@@ -31,12 +31,18 @@ function standardDecorators(): Plugin {
 
 export default defineConfig({
 	root: 'src/client',
+	/**
+	 * Chemins relatifs : l'appli marche aussi bien à la racine d'un domaine (serveur Node)
+	 * que dans un sous-dossier comme https://arthurg94.github.io/loup-garou-mj/ (GitHub Pages).
+	 */
+	base: './',
 	plugins: [standardDecorators()],
 	build: {
 		outDir: '../../dist/client',
 		emptyOutDir: true,
 	},
 	server: {
+		// Utile seulement avec `npm run dev:serveur` : l'appli statique n'appelle aucune API.
 		proxy: {
 			'/api': 'http://localhost:3000',
 		},

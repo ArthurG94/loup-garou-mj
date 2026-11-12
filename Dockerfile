@@ -4,7 +4,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
-RUN npm run build
+RUN npm run build:serveur
 
 # Exécution : seulement les dépendances de production et le code construit.
 FROM node:22-slim
