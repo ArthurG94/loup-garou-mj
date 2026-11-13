@@ -1,6 +1,6 @@
-import { deathsDuring, deckCount, findPlayer, holders, inDeck, isPackWolf, previousNight } from './engine.js';
+import { deathsDuring, deckCount, findPlayer, holders, inDeck, isPackWolf, potionsOf, previousNight } from './engine.js';
 import { ROLES } from './roles.js';
-import type { GameState, PhaseKind, RoleId } from './types.js';
+import type { GameState, PhaseKind, Player, RoleId } from './types.js';
 
 /** Outil interactif affiché sous le texte d'une étape. */
 export type Widget
@@ -462,6 +462,21 @@ export const STEP_DEFS: readonly StepDef[] = [
 	},
 ];
 
+/**
+ * Une détentrice de la potion de guérison dévorée cette nuit se réveille quand même :
+ * elle peut se sauver elle-même.
+ */
+function canSaveHerself(state: GameState, def: StepDef, player: Player): boolean {
+	const death = player.death;
+	return def.widget === 'potions'
+		&& player.roleId !== null
+		&& death !== null
+		&& (death.cause === 'loups' || death.cause === 'grand-mechant-loup')
+		&& death.phase.kind === state.phase.kind
+		&& death.phase.turn === state.phase.turn
+		&& potionsOf(state, player.roleId).guerison;
+}
+
 /** Raison de faire semblant d'appeler un rôle, pour ne rien révéler aux joueurs. */
 function fakeReason(state: GameState, def: StepDef): string | null {
 	if (def.roles.length === 0 || def.roles === PACK_ROLES) {
@@ -469,7 +484,7 @@ function fakeReason(state: GameState, def: StepDef): string | null {
 	}
 	const people = def.roles.flatMap(roleId => holders(state, roleId));
 	const expected = def.roles.reduce((sum, roleId) => sum + deckCount(state, roleId), 0);
-	const living = people.filter(player => player.alive);
+	const living = people.filter(player => player.alive || canSaveHerself(state, def, player));
 	if (people.length >= expected && living.length === 0 && def.widget !== 'hunter') {
 		return 'Ce rôle est mort : faites semblant de l\'appeler.';
 	}

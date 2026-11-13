@@ -83,6 +83,25 @@ describe('règles des rôles', () => {
 		}).toThrow();
 	});
 
+	it('la sorcière dévorée cette nuit se réveille et peut se sauver elle-même', () => {
+		const state = game(['loup-garou', 'sorciere', 'villageois']);
+		goTo(state, 'nuit', 2);
+		attack(state, 'p2');
+		expect(stepsFor(state).find(step => step.id === 'n-sorciere')?.fake).toBeNull();
+		heal(state, 'sorciere', 'p2');
+		expect(state.players[1]?.alive).toBe(true);
+	});
+
+	it('la sorcière dévorée sans potion de guérison ne se réveille pas', () => {
+		const state = game(['loup-garou', 'sorciere', 'villageois', 'villageois']);
+		goTo(state, 'nuit', 2);
+		attack(state, 'p3');
+		heal(state, 'sorciere', 'p3');
+		goTo(state, 'nuit', 3);
+		attack(state, 'p2');
+		expect(stepsFor(state).find(step => step.id === 'n-sorciere')?.fake).not.toBeNull();
+	});
+
 	it('l\'idiot survit au vote mais ne vote plus', () => {
 		const state = game(['loup-garou', 'idiot', 'villageois']);
 		goTo(state, 'soir', 1);
