@@ -66,6 +66,11 @@ export class LgCard extends LitElement {
 			cursor: zoom-in;
 		}
 
+		/* Carte en plein écran : on peut la faire pivoter du doigt sans faire défiler la page. */
+		:host([size="large"]:not([zoomable])) {
+			touch-action: none;
+		}
+
 		.tilt {
 			transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
 			transform-style: preserve-3d;
@@ -87,6 +92,7 @@ export class LgCard extends LitElement {
 		.face {
 			position: absolute;
 			inset: 0;
+			-webkit-backface-visibility: hidden;
 			backface-visibility: hidden;
 			border-radius: 7.5cqw;
 			overflow: hidden;
@@ -218,8 +224,8 @@ export class LgCard extends LitElement {
 			font-size: 11cqw;
 		}
 
-		/* Sur téléphone, les grandes cartes suivent le gyroscope (voir tilt.ts). */
-		:host([size="large"]) .tilt {
+		/* Sur téléphone, les cartes suivent le gyroscope (voir tilt.ts). */
+		:host(:not([size="mini"])) .tilt {
 			transform: rotateX(var(--rx, var(--device-rx, 0deg))) rotateY(var(--ry, var(--device-ry, 0deg)));
 		}
 
@@ -306,14 +312,22 @@ export class LgCard extends LitElement {
 	public accessor zoomable = true;
 
 	private frame = 0;
+	/** Un doigt ou un stylet touche la carte. */
+	private pressed = false;
 
 	/**
-	 * L'inclinaison suit le pointeur. Les mesures se font sur l'élément hôte, qui ne bouge pas :
-	 * mesurer la carte inclinée elle-même la faisait clignoter.
+	 * L'inclinaison suit le pointeur : la souris au survol, le doigt (ou le stylet) tant qu'il touche la carte.
+	 * Les mesures se font sur l'élément hôte, qui ne bouge pas : mesurer la carte inclinée elle-même la faisait clignoter.
 	 */
 	private readonly onMove = (event: PointerEvent): void => {
-		if (this.size === 'mini' || event.pointerType !== 'mouse') {
+		if (this.size === 'mini') {
 			return;
+		}
+		if (event.pointerType !== 'mouse' && event.type === 'pointermove' && !this.pressed) {
+			return;
+		}
+		if (event.type === 'pointerdown' && event.pointerType !== 'mouse') {
+			this.pressed = true;
 		}
 		const { clientX, clientY } = event;
 		cancelAnimationFrame(this.frame);
@@ -327,6 +341,14 @@ export class LgCard extends LitElement {
 			this.style.setProperty('--rx', `${(0.5 - y) * 16}deg`);
 			this.style.setProperty('--glare', '0.9');
 		});
+	};
+
+	/** Le doigt quitte l'écran, ou le navigateur reprend la main pour faire défiler : la carte revient à plat. */
+	private readonly onRelease = (event: PointerEvent): void => {
+		if (event.pointerType !== 'mouse') {
+			this.pressed = false;
+			this.onLeave();
+		}
 	};
 
 	private readonly onLeave = (): void => {
@@ -344,14 +366,20 @@ export class LgCard extends LitElement {
 
 	public override connectedCallback(): void {
 		super.connectedCallback();
+		this.addEventListener('pointerdown', this.onMove);
 		this.addEventListener('pointermove', this.onMove);
+		this.addEventListener('pointerup', this.onRelease);
+		this.addEventListener('pointercancel', this.onRelease);
 		this.addEventListener('pointerleave', this.onLeave);
 		this.addEventListener('click', this.onClick);
 	}
 
 	public override disconnectedCallback(): void {
 		super.disconnectedCallback();
+		this.removeEventListener('pointerdown', this.onMove);
 		this.removeEventListener('pointermove', this.onMove);
+		this.removeEventListener('pointerup', this.onRelease);
+		this.removeEventListener('pointercancel', this.onRelease);
 		this.removeEventListener('pointerleave', this.onLeave);
 		this.removeEventListener('click', this.onClick);
 	}
