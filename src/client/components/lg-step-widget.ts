@@ -20,6 +20,15 @@ import './lg-player-picker.js';
 
 type Answer = { tone: 'yes' | 'no' | 'info'; text: string } | null;
 
+/** Action restée en attente quand le MJ veut passer à la suite. */
+export interface PendingAction {
+	readonly title: string;
+	readonly message: string;
+}
+
+/** Étapes (phase + étape) où le MJ a déjà enregistré une action, même s'il revient en arrière. */
+const validatedSteps = new Set<string>();
+
 /** Outils interactifs d'une étape : désigner un joueur, voir la réponse, utiliser une potion… */
 @customElement('lg-step-widget')
 export class LgStepWidget extends LitElement {
@@ -141,12 +150,76 @@ export class LgStepWidget extends LitElement {
 					this.answer = result;
 				}
 			});
+			validatedSteps.add(this.stepKey);
 		} catch (error) {
 			if (error instanceof RuleError) {
 				this.error = error.message;
 			} else {
 				throw error;
 			}
+		}
+	}
+
+	/**
+	 * Action de l'étape que le MJ n'a pas encore validée, ou null si on peut passer sans rien demander.
+	 * Les étapes de simple information (voyante, fouineuse…) ne bloquent jamais.
+	 */
+	public pendingAction(): PendingAction | null {
+		const game = this.game;
+		const step = this.step;
+		if (!game || !step || step.fake || validatedSteps.has(this.stepKey)) {
+			return null;
+		}
+		const nobody = (message: string): PendingAction => ({ title: 'Action non validée', message: `${message} Continuer quand même ?` });
+		switch (step.widget) {
+			case 'attack': {
+				if (game.flags.noAttackTurn === game.phase.turn || deathsDuring(game, game.phase).some(player => player.death?.cause === 'loups')) {
+					return null;
+				}
+				const target = this.picked[0];
+				return {
+					title: 'Attaque non validée',
+					message: target
+						? `${this.name(target)} est choisi, mais l'attaque des loups n'a pas été validée. Continuer sans victime ?`
+						: 'Aucune victime des loups n\'a été choisie. Continuer sans victime ?',
+				};
+			}
+			case 'second-attack':
+				return nobody('Le Grand Méchant Loup n\'a pas choisi de seconde victime.');
+			case 'mentor':
+				return game.flags.mentorId ? null : nobody('Aucun mentor n\'a été choisi pour l\'enfant sauvage.');
+			case 'lovers': {
+				const lover = holderOf(game, step.roles[0] ?? 'amoureux');
+				return lover && loverOf(game, lover.id) ? null : nobody('Aucune âme-sœur n\'a été choisie.');
+			}
+			case 'louveteau':
+			case 'louve':
+			case 'sainte-mere':
+				return nobody('Personne n\'a été désigné.');
+			case 'protect':
+				return game.flags.protectedId ? null : nobody('Le salvateur n\'a protégé personne.');
+			case 'paralyse':
+				return game.flags.paralysedId ? null : nobody('Le Sinistros n\'a paralysé personne.');
+			case 'potions': {
+				const left = potionsOf(game, this.stepRole() ?? 'sorciere');
+				return left.guerison || left.mort || left.sommeil
+					? { title: 'Aucune potion utilisée', message: 'Aucune potion n\'a été utilisée. Continuer sans potion ?' }
+					: null;
+			}
+			case 'hunter':
+				return nobody('Le chasseur n\'a emporté personne.');
+			case 'knight': {
+				const wolf = knightVictim(game);
+				return wolf?.alive ? nobody(`${wolf.name} n'a pas été éliminé.`) : null;
+			}
+			case 'hypnosis':
+				return game.flags.hypnosis ? null : nobody('L\'hypnose n\'a pas été enregistrée.');
+			case 'vote':
+				return game.flags.noVoteTurn === game.phase.turn ? null : { title: 'Vote non enregistré', message: 'Le résultat du vote n\'a pas été enregistré. Continuer quand même ?' };
+			case 'mayor':
+				return game.flags.mayorId ? null : nobody('Aucun maire n\'a été élu.');
+			default:
+				return null;
 		}
 	}
 
