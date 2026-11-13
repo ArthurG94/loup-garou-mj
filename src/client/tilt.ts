@@ -1,5 +1,5 @@
 /**
- * Inclinaison des grandes cartes au gyroscope, sur téléphone.
+ * Inclinaison des cartes au gyroscope, sur téléphone.
  *
  * Les angles sont publiés en variables CSS sur la racine du document (--device-rx, --device-ry,
  * --device-mx, --device-my) : les cartes en héritent, sans écouteur par carte.
@@ -17,8 +17,11 @@ interface OrientationEventWithPermission {
 const MAX_TILT = 9;
 /** Angle du téléphone (en degrés) qui donne l'inclinaison maximale. */
 const RANGE = 20;
-/** Vitesse à laquelle la position de référence rattrape le téléphone (par événement). */
-const DRIFT = 0.02;
+/**
+ * Vitesse à laquelle la position de référence rattrape le téléphone (par événement, ~60 par seconde).
+ * Assez lente pour que l'inclinaison reste visible quelques secondes.
+ */
+const DRIFT = 0.004;
 
 const root = document.documentElement;
 let baseline: { beta: number; gamma: number } | null = null;
@@ -76,15 +79,33 @@ export function gyroNeedsPermission(): boolean {
 /** À appeler depuis un geste de l'utilisateur (un clic sur un bouton). */
 export async function enableGyro(): Promise<void> {
 	try {
-		await permissionApi()?.();
+		if (await permissionApi()?.() === 'granted') {
+			// Par prudence, on réinscrit l'écouteur une fois l'autorisation accordée.
+			window.removeEventListener('deviceorientation', onOrientation);
+			window.addEventListener('deviceorientation', onOrientation);
+		}
 	} catch {
 		// Refus ou appel hors d'un geste : le bouton reste proposé.
 	}
 }
 
-/** Écoute le gyroscope dès le départ : Chrome sur Android l'envoie sans rien demander. */
+/**
+ * Écoute le gyroscope dès le départ : Chrome sur Android l'envoie sans rien demander.
+ * Safari sur iPhone exige une autorisation demandée pendant un geste : on la demande au premier toucher,
+ * le bouton « Effet 3D » reste proposé si elle est refusée.
+ */
 export function initGyro(): void {
-	if (supported) {
-		window.addEventListener('deviceorientation', onOrientation);
+	if (!supported) {
+		return;
+	}
+	window.addEventListener('deviceorientation', onOrientation);
+	if (permissionApi() !== undefined) {
+		const ask = (): void => {
+			document.removeEventListener('click', ask, true);
+			if (!receiving) {
+				void enableGyro();
+			}
+		};
+		document.addEventListener('click', ask, true);
 	}
 }
