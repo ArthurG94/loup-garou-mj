@@ -6,13 +6,13 @@ import {
 	searchLouveteau, setChamanAwake, setLovers, setMayor, setMentor, setSectGroup, sleep, heal, vote, holderOf,
 } from '../../shared/actions.js';
 import {
-	alignment, alivePlayers, bearGrowls, deathsDuring, detectVictory, findPlayer, isPackWolf, knightVictim,
+	alignment, alivePlayers, bearGrowls, currentCamp, deathsDuring, detectVictory, findPlayer, isPackWolf, knightVictim,
 	lastDead, loverOf, potionsOf, previousNight, VICTORY_LABELS, wolfCount,
 } from '../../shared/engine.js';
 import { getRole, roleLabel } from '../../shared/roles.js';
 import { wokeUpTonight } from '../../shared/steps.js';
 import type { Step } from '../../shared/steps.js';
-import type { GameState, Player, RoleId } from '../../shared/types.js';
+import type { Camp, GameState, Player, RoleId } from '../../shared/types.js';
 import { store } from '../store.js';
 import { shared } from '../styles.js';
 import './lg-card.js';
@@ -60,6 +60,58 @@ export class LgStepWidget extends LitElement {
 			justify-items: center;
 			text-align: center;
 			font-size: 0.85rem;
+		}
+
+		.survivors {
+			display: grid;
+			gap: 12px;
+		}
+
+		.camp {
+			display: grid;
+			gap: 10px;
+			padding: 12px;
+			border-radius: 16px;
+			border: 1px solid color-mix(in oklab, var(--camp) 55%, transparent);
+			background: linear-gradient(160deg, color-mix(in oklab, var(--camp) 22%, var(--surface-2)), var(--surface-2) 70%);
+		}
+
+		.camp-title {
+			display: flex;
+			align-items: baseline;
+			justify-content: space-between;
+			gap: 8px;
+			font-family: var(--font-display);
+			font-size: 1.4rem;
+			line-height: 1;
+			color: var(--camp-light);
+		}
+
+		.camp-title small {
+			font-family: var(--font-body);
+			font-size: 0.8rem;
+			font-weight: 800;
+			color: var(--muted);
+		}
+
+		.camp-cards {
+			display: grid;
+			grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+			gap: 12px 10px;
+		}
+
+		.camp-cards .victim {
+			align-content: start;
+			min-width: 0;
+		}
+
+		.camp-cards lg-card {
+			--w: 88px;
+		}
+
+		.camp-cards .tags {
+			font-size: 0.75rem;
+			color: var(--muted);
 		}
 
 		.sect {
@@ -553,11 +605,58 @@ export class LgStepWidget extends LitElement {
 	private renderVictory(game: GameState): TemplateResult {
 		const wins = detectVictory(game);
 		if (game.players.some(player => player.alive && player.roleId === null)) {
-			return html`<p class="muted">Tous les rôles ne sont pas renseignés : vérifiez vous-même. Village : plus de loup ni de solitaire. Loups : plus que la meute. Loup blanc : seul survivant. Couple : seuls les deux amoureux. Sectaire : l'autre groupe éliminé.</p>`;
+			return html`<p class="muted">Tous les rôles ne sont pas renseignés : vérifiez vous-même. Village : plus de loup ni de solitaire. Loups : plus que la meute. Loup blanc : seul survivant. Couple : seuls les deux amoureux. Sectaire : l'autre groupe éliminé.</p>
+				${this.renderSurvivors(game)}`;
 		}
-		return wins.length > 0
-			? html`${wins.map(win => html`<div class="answer yes">🏆 ${VICTORY_LABELS[win]}</div>`)}`
-			: html`<div class="answer no">Aucune victoire : la partie continue.</div>`;
+		return html`${wins.length > 0
+			? wins.map(win => html`<div class="answer yes">🏆 ${VICTORY_LABELS[win]}</div>`)
+			: html`<div class="answer no">Aucune victoire : la partie continue.</div>`}
+			${this.renderSurvivors(game)}`;
+	}
+
+	/** Joueurs encore en vie, regroupés par camp actuel, carte visible (les morts restent cachés). */
+	private renderSurvivors(game: GameState): TemplateResult {
+		const alive = alivePlayers(game);
+		const camps: { id: Camp | null; title: string }[] = [
+			{ id: 'village', title: 'Village' },
+			{ id: 'loups', title: 'Loups' },
+			{ id: 'solitaire', title: 'Solitaires' },
+			{ id: null, title: 'Rôle inconnu' },
+		];
+		return html`<div class="survivors">
+			<span class="label">Encore en vie · ${alive.length}</span>
+			${camps.map(({ id, title }) => {
+				const members = alive.filter(player => currentCamp(game, player) === id);
+				return members.length === 0
+					? nothing
+					: html`<section class="camp" style=${`--camp: var(--${id ?? 'line'}); --camp-light: var(--${id ? `${id}-light` : 'muted'})`}>
+						<div class="camp-title">${title}<small>${members.length}</small></div>
+						<div class="camp-cards">${members.map(player => html`<div class="victim">
+							<lg-card size="mini" .roleId=${player.roleId} .face=${player.roleId ? 'front' : 'back'} .caption=${player.name}></lg-card>
+							<strong>${player.name}</strong>
+							${this.survivorTags(game, player)}
+						</div>`)}</div>
+					</section>`;
+			})}
+		</div>`;
+	}
+
+	private survivorTags(game: GameState, player: Player): TemplateResult | typeof nothing {
+		const tags: string[] = [];
+		const lover = loverOf(game, player.id);
+		if (lover) {
+			tags.push(`💞 ${lover.name}`);
+		}
+		if (game.flags.mayorId === player.id) {
+			tags.push('🎖 maire');
+		}
+		if (player.infected) {
+			tags.push('☣ infecté');
+		}
+		if (player.sectGroup) {
+			tags.push(`groupe ${player.sectGroup}`);
+		}
+		return tags.length === 0 ? nothing : html`<span class="tags">${tags.join(' · ')}</span>`;
 	}
 }
 
