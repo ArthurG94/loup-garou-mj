@@ -1,6 +1,6 @@
 import { css, html, LitElement, nothing } from 'lit';
 import type { PropertyValues, TemplateResult } from 'lit';
-import { customElement, property, state } from 'lit/decorators.js';
+import { customElement, property, query, state } from 'lit/decorators.js';
 import { assignRole } from '../../shared/actions.js';
 import { deckCount, holders, nextPhase, phaseLabel } from '../../shared/engine.js';
 import { roleLabel } from '../../shared/roles.js';
@@ -9,7 +9,10 @@ import type { Step } from '../../shared/steps.js';
 import type { GameState, RoleId } from '../../shared/types.js';
 import { store } from '../store.js';
 import { shared } from '../styles.js';
+import type { LgConfirm } from './lg-confirm.js';
+import type { LgStepWidget } from './lg-step-widget.js';
 import './lg-card.js';
+import './lg-confirm.js';
 import './lg-player-picker.js';
 import './lg-step-widget.js';
 
@@ -156,7 +159,22 @@ export class LgNarration extends LitElement {
 	@state()
 	private accessor face: 'front' | 'back' = 'front';
 
+	@query('lg-step-widget')
+	private accessor widget: LgStepWidget | null = null;
+
+	@query('lg-confirm')
+	private accessor confirm: LgConfirm | null = null;
+
 	private shownKey = '';
+
+	/** Passe à la suite, après confirmation si l'action de l'étape n'a pas été validée. */
+	private async next(): Promise<void> {
+		const pending = this.widget?.pendingAction();
+		if (pending && this.confirm && !await this.confirm.ask({ ...pending, confirmLabel: 'Continuer' })) {
+			return;
+		}
+		store.next();
+	}
 
 	protected override updated(changed: PropertyValues<this>): void {
 		if (!changed.has('game') || !this.game) {
@@ -263,9 +281,10 @@ export class LgNarration extends LitElement {
 					store.previous();
 				}}>◀</button>
 				<button class="btn primary" @click=${(): void => {
-					store.next();
+					void this.next();
 				}}>${isLast ? `Passer : ${phaseLabel(nextPhase(game.phase))}` : 'Étape suivante ▶'}</button>
-			</nav>`;
+			</nav>
+			<lg-confirm></lg-confirm>`;
 	}
 }
 
