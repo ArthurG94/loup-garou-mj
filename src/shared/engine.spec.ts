@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { attack, heal, hunterShot, louveteauSearch, poison, protect, searchLouveteau, vote } from './actions.js';
-import { advancePhase, bearGrowls, createGame, createPlayer, detectVictory, knightVictim, wolfCount } from './engine.js';
+import { advancePhase, bearGrowls, createGame, createPlayer, detectVictory, fitRolesToDeck, knightVictim, roleChoices, wolfCount } from './engine.js';
 import { stepsFor, wokeUpTonight } from './steps.js';
 import type { GameState, RoleId } from './types.js';
 
@@ -209,5 +209,27 @@ describe('victoire', () => {
 		state.players[1]!.alive = false;
 		state.players[2]!.alive = false;
 		expect(detectVictory(state)).toEqual(['loup-blanc']);
+	});
+});
+
+describe('rôles proposables', () => {
+	const deck: Partial<Record<RoleId, number>> = { 'loup-garou': 2, 'voyante-clairvoyante': 1 };
+	const players = (roles: (RoleId | null)[]): ReturnType<typeof createPlayer>[] => roles.map((roleId, index) => ({ ...createPlayer(`J${index + 1}`, `p${index + 1}`), roleId }));
+
+	it('ne propose que les cartes du paquet', () => {
+		const ids = roleChoices(deck, players([null, null]), 'p1').map(choice => choice.role.id);
+		expect(ids).toEqual(['loup-garou', 'voyante-clairvoyante']);
+	});
+
+	it('retire une carte dont tous les exemplaires sont attribués', () => {
+		const table = players(['loup-garou', 'loup-garou', 'voyante-clairvoyante', null]);
+		expect(roleChoices(deck, table, 'p4')).toEqual([]);
+		expect(roleChoices(deck, table, 'p1').map(choice => [choice.role.id, choice.left])).toEqual([['loup-garou', 1]]);
+	});
+
+	it('enlève les rôles qui ne sont plus dans le paquet ou en surnombre', () => {
+		const table = players(['loup-garou', 'sorciere', 'loup-garou', 'loup-garou']);
+		fitRolesToDeck(deck, table);
+		expect(table.map(player => player.roleId)).toEqual(['loup-garou', null, 'loup-garou', null]);
 	});
 });
