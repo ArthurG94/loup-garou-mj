@@ -1,5 +1,5 @@
 import { getRole, ROLES } from './roles.js';
-import type { Camp, DeathCause, GameFlags, GameState, Phase, PhaseKind, Player, RoleId } from './types.js';
+import type { Camp, DeathCause, GameFlags, GameState, Phase, PhaseKind, Player, Role, RoleId } from './types.js';
 
 export const PHASE_LABELS: Record<PhaseKind, string> = {
 	'premiere-nuit': 'Première nuit',
@@ -102,6 +102,55 @@ export function deckCount(state: GameState, roleId: RoleId): number {
 
 export function inDeck(state: GameState, roleId: RoleId): boolean {
 	return deckCount(state, roleId) > 0;
+}
+
+/** Rôle proposable pour un joueur, avec le nombre d'exemplaires encore libres. */
+export interface RoleChoice {
+	role: Role;
+	left: number;
+}
+
+/**
+ * Rôles que l'on peut attribuer à un joueur : uniquement les cartes du paquet,
+ * et seulement tant qu'il en reste un exemplaire non attribué à un autre joueur.
+ * Le rôle actuel du joueur reste proposé s'il fait partie du paquet.
+ */
+export function roleChoices(deck: Partial<Record<RoleId, number>>, players: readonly Player[], playerId: string): RoleChoice[] {
+	const current = players.find(player => player.id === playerId)?.roleId ?? null;
+	const choices: RoleChoice[] = [];
+	for (const role of ROLES) {
+		const count = deck[role.id] ?? 0;
+		const taken = players.filter(player => player.id !== playerId && player.roleId === role.id).length;
+		const left = count - taken;
+		if (left > 0 || (role.id === current && count > 0)) {
+			choices.push({ role, left: Math.max(left, 0) });
+		}
+	}
+	return choices;
+}
+
+/** Précision affichée à côté d'un rôle en plusieurs exemplaires : combien sont encore libres. */
+export function choiceHint(count: number, left: number, current: boolean): string {
+	return count > 1 && !current ? ` (${left}/${count} libres)` : '';
+}
+
+/**
+ * Retire les rôles attribués qui ne correspondent plus au paquet : carte retirée,
+ * ou plus de joueurs que d'exemplaires (les premiers joueurs gardent leur rôle).
+ */
+export function fitRolesToDeck(deck: Partial<Record<RoleId, number>>, players: Player[]): void {
+	const used: Partial<Record<RoleId, number>> = {};
+	for (const player of players) {
+		if (!player.roleId) {
+			continue;
+		}
+		const count = (used[player.roleId] ?? 0) + 1;
+		if (count > (deck[player.roleId] ?? 0)) {
+			player.roleId = null;
+		} else {
+			used[player.roleId] = count;
+		}
+	}
 }
 
 /** Nombre de cartes par camp dans le paquet, pour la jauge de préparation. */

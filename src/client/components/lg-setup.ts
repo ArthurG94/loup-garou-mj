@@ -1,8 +1,8 @@
 import { css, html, LitElement, nothing } from 'lit';
 import type { TemplateResult } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import { createPlayer, deckBalance, deckSize } from '../../shared/engine.js';
-import { getRole, ROLES } from '../../shared/roles.js';
+import { createPlayer, deckBalance, choiceHint, deckSize, roleChoices } from '../../shared/engine.js';
+import { ROLES } from '../../shared/roles.js';
 import type { Camp, RoleId } from '../../shared/types.js';
 import { store } from '../store.js';
 import type { SetupDraft } from '../store.js';
@@ -330,7 +330,6 @@ export class LgSetup extends LitElement {
 	}
 
 	private renderAssign(setup: SetupDraft): TemplateResult {
-		const inDeck = ROLES.filter(role => (setup.deck[role.id] ?? 0) > 0);
 		return html`<details>
 			<summary>Attribuer les rôles maintenant (facultatif)</summary>
 			<p class="hint">Sinon, l'appli vous demandera qui se réveille au moment où chaque rôle est appelé.</p>
@@ -347,7 +346,7 @@ export class LgSetup extends LitElement {
 						});
 					}}>
 						<option value="" ?selected=${player.roleId === null}>${player.name} : rôle inconnu</option>
-						${inDeck.map(role => html`<option value=${role.id} ?selected=${player.roleId === role.id}>${player.name} : ${getRole(role.id).name}</option>`)}
+						${roleChoices(setup.deck, setup.players, player.id).map(({ role, left }) => html`<option value=${role.id} ?selected=${player.roleId === role.id}>${player.name} : ${role.name}${choiceHint(setup.deck[role.id] ?? 0, left, player.roleId === role.id)}</option>`)}
 					</select>
 				</li>`)}
 			</ol>

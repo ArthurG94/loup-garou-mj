@@ -1,4 +1,4 @@
-import { advancePhase, createGame, createPlayer } from '../shared/engine.js';
+import { advancePhase, createGame, createPlayer, fitRolesToDeck } from '../shared/engine.js';
 import { currentStepIndex, stepsFor } from '../shared/steps.js';
 import type { GameState, Player, RoleId } from '../shared/types.js';
 
@@ -30,6 +30,7 @@ function load(): Saved {
 		if (raw) {
 			const saved = JSON.parse(raw) as { setup?: SetupDraft; game?: { version?: number } | null };
 			if (saved.setup && (!saved.game || saved.game.version === 1)) {
+				fitRolesToDeck(saved.setup.deck, saved.setup.players);
 				return saved as Saved;
 			}
 		}
@@ -60,6 +61,8 @@ class Store extends EventTarget {
 	public updateSetup(change: (setup: SetupDraft) => void): void {
 		const next = structuredClone(this.saved.setup);
 		change(next);
+		// Un rôle attribué doit toujours correspondre à une carte du paquet.
+		fitRolesToDeck(next.deck, next.players);
 		this.saved.setup = next;
 		this.commit();
 	}
@@ -99,6 +102,7 @@ class Store extends EventTarget {
 		this.saved.game.players.forEach((player, index) => {
 			player.roleId = players[index]?.roleId ?? null;
 		});
+		fitRolesToDeck(deck, this.saved.game.players);
 		this.history = [];
 		this.commit();
 	}

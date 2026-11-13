@@ -2,8 +2,8 @@ import { css, html, LitElement, nothing } from 'lit';
 import type { TemplateResult } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { assignRole, togglePlayerAlive } from '../../shared/actions.js';
-import { currentCamp, inDeck, loverOf, phaseLabel, potionsOf } from '../../shared/engine.js';
-import { getRole, ROLES } from '../../shared/roles.js';
+import { choiceHint, currentCamp, inDeck, loverOf, phaseLabel, potionsOf, roleChoices } from '../../shared/engine.js';
+import { getRole } from '../../shared/roles.js';
 import type { GameState, Player, RoleId } from '../../shared/types.js';
 import { store } from '../store.js';
 import { shared } from '../styles.js';
@@ -127,7 +127,7 @@ export class LgVillage extends LitElement {
 	}
 
 	private renderPlayer(game: GameState, player: Player): TemplateResult {
-		const roles = ROLES.filter(role => inDeck(game, role.id));
+		const roles = roleChoices(game.deck, game.players, player.id);
 		return html`<div class="player">
 			<lg-card size="mini" .roleId=${player.roleId} .face=${player.roleId ? 'front' : 'back'} .caption=${player.name} ?dead=${!player.alive}></lg-card>
 			<span class="name">${player.name}</span>
@@ -139,7 +139,7 @@ export class LgVillage extends LitElement {
 				});
 			}}>
 				<option value="" ?selected=${player.roleId === null}>Rôle inconnu</option>
-				${roles.map(role => html`<option value=${role.id} ?selected=${player.roleId === role.id}>${role.name}</option>`)}
+				${roles.map(({ role, left }) => html`<option value=${role.id} ?selected=${player.roleId === role.id}>${role.name}${choiceHint(game.deck[role.id] ?? 0, left, player.roleId === role.id)}</option>`)}
 			</select>
 			<button class="btn small ${player.alive ? 'danger' : ''}" @click=${(): void => {
 				store.updateGame((next) => {
